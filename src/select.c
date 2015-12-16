@@ -751,22 +751,24 @@ static void selectInnerLoop(/*select内连接循环*/
 		*/
 	case SRT_Except: {/*如果eDest为SRT_Except，则从union索引中移除结果*/
 		sqlite3VdbeAddOp3(v, OP_IdxDelete, iParm, regResult, nColumn); /*添加一个新的指令VDBE指示当前的列表。返回新指令的地址。*/
-		break;
+	/*	/*把OP_IdxDelete（索引删除）操作送入VDBE，再返回一个新指令地址*/*/
+	break;
 	}
 #endif/*终止if*/
 
 		/* 
 		** Store the result as data using a unique key.
 		** 存储数据使用唯一关键字的结果
-		*/
+		*/	/*使用唯一关键字存储结果*/
 	case SRT_Table:/*如果eDest为SRT_Table，则结果按照自动的rowid自动保存*/
 	case SRT_EphemTab: {/*如果eDest为SRT_EphemTab，则创建临时表并存储为像SRT_Table的表*/
 		int r1 = sqlite3GetTempReg(pParse); /*分配一个新的寄存器用于控制中间结果，并把返回值赋给r1*/
 		testcase(eDest == SRT_Table);/*测试处理的结果集的表名称*/
 		testcase(eDest == SRT_EphemTab);/*测试处理的结果集的表的大小*/
 		sqlite3VdbeAddOp3(v, OP_MakeRecord, regResult, nColumn, r1);/*添加一个新的指令VDBE指示当前的列表。返回新指令的地址。*/
+	
 		if (pOrderBy){/*如果有orderby字句*/
-			pushOntoSorter(pParse, pOrderBy, p, r1);/*插入代码"V"，在分选机将会推进记录到栈的顶部*/
+			pushOntoSorter(pParse, pOrderBy, p, r1);/*插入代码"V"，在分选机将会推进记录到栈的顶部*//*/*把OrderBy送到分拣器的栈顶*/*/
 		}
 		else{
 			int r2 = sqlite3GetTempReg(pParse);/*分配一个新的寄存器用于控制中间结果，并把返回值赋给r2*/
@@ -787,6 +789,9 @@ static void selectInnerLoop(/*select内连接循环*/
 		** 如果我们创建一个"expr IN (SELECT ...)"表达式 ，那么在堆栈上就应该
 		** 有一个单独的对象。把这个对象写入虚拟数据表。
 		*/
+		/* 如果我们创建一个这样的表达式"expr IN (SELECT ...)"
+		** 然后堆中应该只有一个对象，把这个表达式写到没有数据的表中。
+		*/
 	case SRT_Set: {/*如果eDest为SRT_Set，则结果作为关键字存入索引*/
 		assert(nColumn == 1);/*设断点，列数等于1*/
 		p->affinity = sqlite3CompareAffinity(pEList->a[0].pExpr, pDest->affSdst);/*根据表和结果集，存储结构体的亲和性结果集*/
@@ -799,12 +804,15 @@ static void selectInnerLoop(/*select内连接循环*/
 			** 一开始看的时候，你会以为我们能在这种情况下优化了order by，
 			** 但是，使用了LIMIT字句的时候，排序就重要了
 			*/
+			/*
+			**一开始看的时候，你会以为对整个集合的顺序进行ORDER BY优化是不重要的.但是，使用了LIMIT关键字时候，排序就重要了。
+			*/
 			pushOntoSorter(pParse, pOrderBy, p, regResult);/*推入栈顶*/
 		}
 		else{
-			int r1 = sqlite3GetTempReg(pParse);/*分配一个寄存器，存储中间计算结果*/
+			int r1 = sqlite3GetTempReg(pParse);/*分配一个寄存器，存储中间计算结果*//*进行ORDERBY操作，然后放到分拣器的栈顶*/
 			sqlite3VdbeAddOp4(v, OP_MakeRecord, regResult, 1, r1, &p->affinity, 1);/*把OP_MakeRecord操作送入VDBE，再返回一个新指令地址*/
-			sqlite3ExprCacheAffinityChange(pParse, regResult, 1);/*记录亲和类型的数据的改变的计数寄存器的起始地址*/
+			sqlite3ExprCacheAffinityChange(pParse, regResult, 1);/*记录亲和类型的数据的改变的计数寄存器的起始地址*//*记录从istart开始发生icount寄存器中的改变的事实*/
 			sqlite3VdbeAddOp2(v, OP_IdxInsert, iParm, r1);/*把OP_IdxInsert操作送入VDBE，再返回一个新指令地址*/
 			sqlite3ReleaseTempReg(pParse, r1);/*释放寄存器*/
 		}
@@ -829,11 +837,11 @@ static void selectInnerLoop(/*select内连接循环*/
 		** store the results in the appropriate memory cell and break out
 		** of the scan loop.
 		** 这个标量选择是表达式的一部分，然后将结果存储在适当的存储单元并中止扫描循环。
-		*/
+		*/ /*如果标量查询是这个表达式的一部分，然后将结果存储在适当的存储单元，中止扫描循环。*/
 	case SRT_Mem: {/*如果eDest为SRT_Mem，则将结果存储在存储单元*/
 		assert(nColumn == 1);/*做断点，判断被提取的值列表是否为空*/
 		if (pOrderBy){
-			pushOntoSorter(pParse, pOrderBy, p, regResult);/*推入栈顶*/
+			pushOntoSorter(pParse, pOrderBy, p, regResult);/*推入栈顶*//*把ORDERBY操作记录放到分拣器的栈顶*/
 		}
 		else{
 			sqlite3ExprCodeMove(pParse, regResult, iParm, 1);/*释放寄存器中的内容，保持寄存器的内容及时更新*/
@@ -850,13 +858,13 @@ static void selectInnerLoop(/*select内连接循环*/
 		** case of a subroutine, the subroutine itself is responsible for
 		** popping the data from the stack.
 		** 将数据发送到回调函数或子程序。在子程序的情况下，子程序本身负责从堆栈中弹出数据。
-		*/
+		*/ 	/*给回调函数或子程序发送数据，在子程序的情况下，子程序本身负责从堆栈中弹出的数据。*/
 		testcase(eDest == SRT_Coroutine);/*测试处理结果集是否是协同处理*/
 		testcase(eDest == SRT_Output);   /*测试处理结果集是否要输出*/
 		if (pOrderBy){/*如果包含了OEDERBY子句*/
 			int r1 = sqlite3GetTempReg(pParse);/*分配一个寄存器，存储中间计算结果*/
 			sqlite3VdbeAddOp3(v, OP_MakeRecord, regResult, nColumn, r1);/*把OP_MakeRecord操作送入VDBE，再返回一个新指令地址*/
-			pushOntoSorter(pParse, pOrderBy, p, r1);/*推入栈顶*/
+			pushOntoSorter(pParse, pOrderBy, p, r1);/*推入栈顶*//*把ORDERBY操作记录放到分拣器的栈顶*/
 			sqlite3ReleaseTempReg(pParse, r1);/*释放寄存器*/
 		}
 		else if (eDest == SRT_Coroutine){/*如果处理结果集是协同处理*/
@@ -890,8 +898,9 @@ static void selectInnerLoop(/*select内连接循环*/
 	** the output for us.
 	** 除了有一个分选机，在这种情况下分选机已经限制了我们的输出。
 	** 如果符合limit子句的条件则跳转到循环结束。
-	*/
-	if (pOrderBy == 0 && p->iLimit){/*如果不包含ORDERBY并且含有limit子句*/
+	*//*如果到了  LIMIT的限制处，直接跳转到循环的结尾，此外，如果有分拣器,
+         在这种情况下分选机已经限制了我们的输出。*/
+	if (pOrderBy == 0 && p->iLimit){/*如果不包含ORDERBY并且含有limit子句*//*如果不包含ORDERBY和limit子句*/
 		sqlite3VdbeAddOp3(v, OP_IfZero, p->iLimit, iBreak, -1);/*把OP_IfZero操作送入VDBE，再返回一个新指令地址*/
 	}
 }
@@ -909,18 +918,20 @@ static void selectInnerLoop(/*select内连接循环*/
 ** 如果ExprList是一个order by或者group by子句，那么KeyInfo结构体适合初始化虚拟索引去实现
 ** 这些子句。如果ExprList是select的结果集，那么KeyInfo结构体适合初始化一个虚拟索引去实
 ** 现DISTINCT测试。
+** 如果这个表达式是ORDERBY或GROUPBY子句，然后结果关键信息结构适合于初始化虚拟索引实现这个子句。
+** 如果这个表达式列表是SELECT的结果集，然后关键信息结构体适合于初始化虚拟索引实现DISTINCT。
 **
 ** Space to hold the KeyInfo structure is obtain from malloc.  The calling
 ** function is responsible for seeing that this structure is eventually
 ** freed.  Add the KeyInfo structure to the P4 field of an opcode using
 ** P4_KEYINFO_HANDOFF is the usual way of dealing with this.
 ** 保存KeyInfo结构体的空间是由malloc获得。调用函数负责看到这个结构体最终释放。
-** KeyInfo结构添加到使用P4_KEYINFO_HANDOFF P4的一个操作码是通常的处理方式。
-*/
-static KeyInfo *keyInfoFromExprList(Parse *pParse, ExprList *pList){/*定义静态的结构体指针函数keyInfoFromExprList*/
+** KeyInfo结构添加到使用P4_KEYINFO_HANDOFF P4的一个操作码是通常的处理方式。	
+** 隔离关键信息结构已分配的内存。回调函数负责最后释放这个结构。添加关键信息结构给P4操作符代码块，通常使用P4_KEYINFO_HANDOFF处理。*/
+static KeyInfo *keyInfoFromExprList(Parse *pParse, ExprList *pList){/*定义静态的结构体指针函数keyInfoFromExprList*//*传入两个参数，一个为语法分析树，一个为表达式列表*/
 	sqlite3 *db = pParse->db;/*把结构体类型是pParse的成员变量db赋给结构体类型是sqlite3的指针db*/
 	int nExpr;
-	KeyInfo *pInfo;/*定义结构体类型是KeyInfo的指针pInfo*/
+	KeyInfo *pInfo;/*定义结构体类型是KeyInfo的指针pInfo*//*声明关键字结构体*/
 	struct ExprList_item *pItem;/*定义结构体类型是ExprList_item的指针pItem*/
 	int i;
 
@@ -928,18 +939,18 @@ static KeyInfo *keyInfoFromExprList(Parse *pParse, ExprList *pList){/*定义静�
 	pInfo = sqlite3DbMallocZero(db, sizeof(*pInfo) + nExpr*(sizeof(CollSeq*) + 1));/*分配并清空内存，分配大小为第二个参数的内存*/
 	if (pInfo){/*如果存在关键字结构体*/
 		pInfo->aSortOrder = (u8*)&pInfo->aColl[nExpr];/*设置关键信息结构体的排序为关键信息结构体中表达式中含有的关键字，其中aColl[1]表示为每一个关键字进行整理*/
-		pInfo->nField = (u16)nExpr;/*对整型nExpr进行强制类型转换成u16，赋给 pInfo->nField*/
+		pInfo->nField = (u16)nExpr;/*对整型nExpr进行强制类型转换成u16，赋给 pInfo->nField*//*关键信息结构体中aColl【】的长度为表达式的个数*/
 		pInfo->enc = ENC(db);/*关键信息结构体中编码方式为db的编码方式*/
 		pInfo->db = db;/*关键信息结构体中数据库为当前使用的数据库*/
 		for (i = 0, pItem = pList->a; i < nExpr; i++, pItem++){/*遍历当前的表达式列表*/
-			CollSeq *pColl;/*定义结构体类型为CollSeq的指针pColl*/
+			CollSeq *pColl;/*定义结构体类型为CollSeq的指针pColl*//*声明一个整理顺序的程序，使用它可以定义排序的名字*/
 			pColl = sqlite3ExprCollSeq(pParse, pItem->pExpr); /*为表达式pExpr返回默认排序顺序。如果没有默认排序类型，返回0.*/
 			if (!pColl){/*如果没有指定排序的方法*/
 				pColl = db->pDfltColl;/*将数据库中默认的排序方法赋值给pColl*/
 			}
 			pInfo->aColl[i] = pColl;/*关键信息结构体中对关键字排序数组中元素对应表达式中排序的名称*/
 			pInfo->aSortOrder[i] = pItem->sortOrder;/*关键信息结构体中排序的顺序为语法分析树中语法项表达式的排序方法*/
-			/*备注：做标记，我没有看懂这种排序的方法，个人理解为把指定使用某种排序的方式记下来，如果没有使用系统默认的。再把语法树中表达式记下来，两者应该是一个东西，只是表达的方式不一样*/
+		
 		}
 	}
 	return pInfo;/*返回这个关键信息结构体*/
@@ -977,8 +988,11 @@ static const char *selectOpName(int id){/*定义静态且是只读的字符型�
 ** "USE TEMP B-TREE FOR xxx"
 ** 其中xxx是"distinct","order by",或者"group by"中的一个。究竟是哪个由
 ** zUsage参数决定。
+除非一个"EXPLAIN QUERY PLAN"命令正在处理，这个功能就是一个空操作，否则会添加一个单独的输出行到EQP结果，输出的格式：
+**USE TEMP B-TREE FOR xxx
+**当XXX是"去除重复"操作，“排序”或者“分组”，究竟是哪个由zUsage参数决定。
 */
-static void explainTempTable(Parse *pParse, const char *zUsage){
+static void explainTempTable(Parse *pParse, const char *zUsage){/*声明表类型*/
 	if (pParse->explain == 2){/*如果语法分析树中的explain是第二个*/
 		Vdbe *v = pParse->pVdbe;/*声明一个虚拟机*/
 		char *zMsg = sqlite3MPrintf(pParse->db, "USE TEMP B-TREE FOR %s", zUsage);/*把输出的格式的内容传递给zMsg，其中%S 是传入的参数在Usage*/
@@ -996,6 +1010,8 @@ static void explainTempTable(Parse *pParse, const char *zUsage){
 ** 赋值表达式b给左值a。第二，无操作符，宏的版本由SQLITE_OMIT_EXPLAIN 定义提供。这允许
 ** sqlite3Select()的代码给结构体的成员变量分配值，如果SQLITE_OMIT_EXPLAIN没有
 ** 定义，没有#ifndef 指令的代码其才会存在。
+** 赋值表达式b给左值a，当定义了SQLITE_OMIT_EXPLAIN每秒中都很多的空操作。只有在没有更改代码和没有定义SQLITE_OMIT_EXPLAIN
+	** 的情况下，才为sqlite3Select()中成员变量赋值。
 */
 # define explainSetInteger(a, b) a = b/*宏定义*/
 
@@ -1027,6 +1043,14 @@ static void explainTempTable(Parse *pParse, const char *zUsage){
 ** iSub1和iSub2整数作为相应的传递函数参数，运算是相同名称的参数
 ** 的文本表示。参数"op"必是TK_UNION, TK_EXCEPT,TK_INTERSECT或者TK_ALL之一。
 ** 如果参数bUseTmp是false就使用第一范式，或者如果是true就使用第二范式。
+**除非执行了“解释查询计划”的命令，这个函数才没有操作。否则，添加一个单独的行进行输出EQP结果。
+**这个输出的格式为：
+**   "COMPOSITE SUBQUERIES iSub1 and iSub2 (op)"
+**  "COMPOSITE SUBQUERIES iSub1 and iSub2 USING TEMP B-TREE (op)"
+**
+**当子查询iSub1和子查询iSub2都是整数那么视为传递函数参数,并且操作在文本中也是一样的。
+** 这个操作必须是TK_UNION, TK_EXCEPT,TK_INTERSECT 或 TK_ALL操作的一种。
+** 如果参数bUseTmp是false就使用第一种形式，或者如果是true就使用第二种形式。
 */
 static void explainComposite(
 	Parse *pParse,                  /* Parse context 语义分析*/
