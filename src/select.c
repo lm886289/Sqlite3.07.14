@@ -1,4 +1,4 @@
-/*
+/* 李敏
 ** 2001 September 15
 **
 ** The author disclaims copyright to this source code.  In place of
@@ -993,10 +993,10 @@ static const char *selectOpName(int id){/*定义静态且是只读的字符型�
 **当XXX是"去除重复"操作，“排序”或者“分组”，究竟是哪个由zUsage参数决定。
 */
 static void explainTempTable(Parse *pParse, const char *zUsage){/*声明表类型*/
-	if (pParse->explain == 2){/*如果语法分析树中的explain是第二个*/
+	if (pParse->explain == 2){/*如果语法分析树中的explain是第二个*//*如果使用了解释方式是语法分析树中第二种方式*/
 		Vdbe *v = pParse->pVdbe;/*声明一个虚拟机*/
-		char *zMsg = sqlite3MPrintf(pParse->db, "USE TEMP B-TREE FOR %s", zUsage);/*把输出的格式的内容传递给zMsg，其中%S 是传入的参数在Usage*/
-		sqlite3VdbeAddOp4(v, OP_Explain, pParse->iSelectId, 0, 0, zMsg, P4_DYNAMIC); /*添加一个操作码，其中包括作为指针的p4值。*/
+		char *zMsg = sqlite3MPrintf(pParse->db, "USE TEMP B-TREE FOR %s", zUsage);/*把输出的格式的内容传递给zMsg，其中%S 是传入的参数在Usage*//*设置标记信息，将子查询1和子查询2的语法内容赋值给zMsg*/
+		sqlite3VdbeAddOp4(v, OP_Explain, pParse->iSelectId, 0, 0, zMsg, P4_DYNAMIC); /*添加一个操作码，其中包括作为指针的p4值。*//*将OP_Explain操作交给虚拟机，然后返回一个地址，地址为P4_DYNAMIC指针中的值*/
 	}
   }
 }
@@ -1012,7 +1012,8 @@ static void explainTempTable(Parse *pParse, const char *zUsage){/*声明表类�
 ** 定义，没有#ifndef 指令的代码其才会存在。
 ** 赋值表达式b给左值a，当定义了SQLITE_OMIT_EXPLAIN每秒中都很多的空操作。只有在没有更改代码和没有定义SQLITE_OMIT_EXPLAIN
 	** 的情况下，才为sqlite3Select()中成员变量赋值。
-*/
+** 赋值表达式b给左值a，当定义了SQLITE_OMIT_EXPLAIN每秒中都很多的空操作。只有在没有更改代码和没有定义SQLITE_OMIT_EXPLAIN
+** 的情况下，才为sqlite3Select()中成员变量赋值。*/
 # define explainSetInteger(a, b) a = b/*宏定义*/
 
 #else
@@ -1051,8 +1052,17 @@ static void explainTempTable(Parse *pParse, const char *zUsage){/*声明表类�
 **当子查询iSub1和子查询iSub2都是整数那么视为传递函数参数,并且操作在文本中也是一样的。
 ** 这个操作必须是TK_UNION, TK_EXCEPT,TK_INTERSECT 或 TK_ALL操作的一种。
 ** 如果参数bUseTmp是false就使用第一种形式，或者如果是true就使用第二种形式。
+**除非执行了“解释查询计划”的命令，这个函数才没有操作。否则，添加一个单独的行进行输出EQP结果。
+**这个输出的格式为：
+**   "COMPOSITE SUBQUERIES iSub1 and iSub2 (op)"
+**   "COMPOSITE SUBQUERIES iSub1 and iSub2 USING TEMP B-TREE (op)"
+**
+** 当子查询iSub1和子查询iSub2都是整数那么视为传递函数参数,并且操作在文本中也是一样的。
+** 这个操作必须是TK_UNION, TK_EXCEPT,TK_INTERSECT 或 TK_ALL操作的一种。
+** 如果参数bUseTmp是false就使用第一种形式，或者如果是true就使用第二种形式。
+**
 */
-static void explainComposite(
+static void explainComposite(/*添加一个单独的行进行输出EQP结果*/
 	Parse *pParse,                  /* Parse context 语义分析*/
 	int op,                         /* One of TK_UNION, TK_EXCEPT etc.   TK_UNION, TK_EXCEPT等运算符中的一个*/
 	int iSub1,                      /* Subquery id 1 子查询id 1*/
@@ -1060,7 +1070,8 @@ static void explainComposite(
 	int bUseTmp                     /* True if a temp table was used 如果临时表被使用就是true*/
 	){
 	assert(op == TK_UNION || op == TK_EXCEPT || op == TK_INTERSECT || op == TK_ALL);/*测试op是否有TK_UNION或TK_EXCEPT或TK_INTERSECT或TK_ALL*/
-	if (pParse->explain == 2){/*如果pParse->explain与字符z相同*/
+	if (pParse->explain == 2){/*如果pParse->explain与字符z相同*/	/*如果使用了解释方式是语法分析树中第二种方式*/
+
 		Vdbe *v = pParse->pVdbe;/*声明一个虚拟机*/
 		char *zMsg = sqlite3MPrintf(/*设置标记信息*/
 			pParse->db, "COMPOUND SUBQUERIES %d AND %d %s(%s)", iSub1, iSub2,
@@ -1082,7 +1093,7 @@ static void explainComposite(
 ** 如果内部循环使用一个非空pOrderBy生成参数,然后把结果放置在一个分选机。
 ** 循环终止后我们需要运行分选机和输出结果。下面的例程生成所需的代码。
 */
-static void generateSortTail(
+static void generateSortTail(/*代码生成*/
 	Parse *pParse,    /* Parsing context 语义分析*/
 	Select *p,        /* The SELECT statement   select语句*/
 	Vdbe *v,          /* Generate code into this VDBE  在VDBE中生成代码**/
@@ -1102,7 +1113,7 @@ static void generateSortTail(
 	int regRow;
 	int regRowid;
 
-	iTab = pOrderBy->iECursor;/*把pOrderBy->iECursor赋给整型iTab*/
+	iTab = pOrderBy->iECursor;/*把pOrderBy->iECursor赋给整型iTab*//*将关联ExprList的VDBE游标传给iTab*/
 	regRow = sqlite3GetTempReg(pParse);/*为pParse语法树分配一个寄存器,存储计算的中间结果*/
 	if (eDest == SRT_Output || eDest == SRT_Coroutine){/*如果处理方式是SRT_Output（输出）或SRT_Coroutine（协同程序）*/
 		pseudoTab = pParse->nTab++;/*逐次将分析语法树中表数传给pseudoTab（虚表）*/
@@ -1114,7 +1125,7 @@ static void generateSortTail(
 	}
 	if (p->selFlags & SF_UseSorter){/*如果Select结构体中的selFlags属性值为SF_UseSorter，使用分拣器（排序程序）*/
 		int regSortOut = ++pParse->nMem;/*分配寄存器，个数是分析语法树中内存数+1*/
-		int ptab2 = pParse->nTab++;/*将分析语法树中表的个数赋值给ptab2*/
+		int ptab2 = pParse->nTab++;/*将分析语法树中表的个数赋值给ptab2*//*将分析语法树中表的个数加1赋值给ptab2*/
 		sqlite3VdbeAddOp3(v, OP_OpenPseudo, ptab2, regSortOut, pOrderBy->nExpr + 2);/*将OP_OpenPseudo（打开虚拟操作）交给VDBE，返回表达式列表中表达式个数的值+2*/
 		addr = 1 + sqlite3VdbeAddOp2(v, OP_SorterSort, iTab, addrBreak);/*将OP_SorterSort（分拣器进行排序）交给VDBE，返回的地址+1赋值给addr*/
 		codeOffset(v, p, addrContinue);/*设置偏移量，其中addrContinue是下一次循环要调到的地址*/
@@ -1155,7 +1166,7 @@ static void generateSortTail(
 		break;
 	}
 #endif/*终止if*/
-	default: {
+	default: {/*默认条件*/
 		int i;
 		assert(eDest == SRT_Output || eDest == SRT_Coroutine); /*插入断点，判断结果集处理类型是否有SRT_Output（输出）或SRT_Coroutine（协同处理）*/
 		testcase(eDest == SRT_Output);/*测试是否包含SRT_Output*/
@@ -1226,6 +1237,16 @@ static void generateSortTail(
 **   SELECT (SELECT col FROM tbl);
 **   SELECT abc FROM (SELECT col AS abc FROM tbl);
 ** 声明类型以外的任何表达式列是空的。
+**返回一个指向表达式pExpr 包含 'declaration type'的字符串。。这个字符串应该能被静态调用的。
+**
+** 如果这个表达式是个列，那么列的声明类型应该在最初创建表格时被准确定义。ROWID字段的声明类型是整数。当一个表达式
+  被认为作为一列在子查询中是复杂的。在所有下面的SELECT语句的结果集的表达被认为是这个函数的列。
+**   SELECT col FROM tbl;
+**   SELECT (SELECT col FROM tbl;
+**   SELECT (SELECT col FROM tbl);
+**   SELECT abc FROM (SELECT col AS abc FROM tbl);
+**
+** 声明的类型可以用在任何表达式上，除了是空的列。
 */
 static const char *columnType(/*定义静态且是只读的字符型指针columnType*/
 	NameContext *pNC, /*声明一个命名上下文结构体（决定表或者列的名字）*/
@@ -1239,7 +1260,8 @@ static const char *columnType(/*定义静态且是只读的字符型指针column
 	char const *zOriginTab = 0;
 	char const *zOriginCol = 0;
 	int j;
-	if (NEVER(pExpr == 0) || pNC->pSrcList == 0) return 0;
+	if (NEVER(pExpr == 0) || pNC->pSrcList == 0) return 0;/*如果一个表达式为空或决定名字的列表是空的，直接返回0*/
+
 
 	switch (pExpr->op){/*遍历表达式中的操作*/
 	case TK_AGG_COLUMN:
@@ -1268,7 +1290,7 @@ static const char *columnType(/*定义静态且是只读的字符型指针column
 			}
 		}
 
-		if (pTab == 0){
+		if (pTab == 0){/*如果表为空*/
 			/* At one time, code such as "SELECT new.x" within a trigger would
 			** cause this condition to run.  Since then, we have restructured how
 			** trigger code is generated and so this condition is no longer
@@ -1297,17 +1319,31 @@ static const char *columnType(/*定义静态且是只读的字符型指针column
 			** 即使它确实应该"INTEGER"。
 			** 这不是一个问题，因为" t1.col "的列类型是从未使用过。当columnType ()被调用的
 			** 表达式"(SELECT t1.col)" ，则返回正确的类型(请参阅下面的TK_SELECT分支)。
+			** 在同一时间，诸如触发器内"SELECT new.x "代码将导致这种状态运行。
+			** 然后我们重新构造了触发器代码，并且这种情况不再可能发生。无论如何，下面的语法是正确的：
+			**
+			**   CREATE TABLE t1(col INTEGER);
+			**   SELECT (SELECT t1.col) FROM FROM t1;
+			**
+			** 当columnType（列类型）被表达式"t1.col"在子查询中调用。在这种情况下，设置列类型为“NULL”，即使
+			** 这个列应该真正为“INTEGER”整数类型。
+			**
+			** 这不是一个问题，因为这个"t1.col"从来没有使用。当这个"t1.col"列类型被"(SELECT t1.col)"表达式调用，这个正确的类型
+			** 将会被返回（参见下面TK_SELECT分支）。
 			*/
 			break;
 		}
 
-		assert(pTab && pExpr->pTab == pTab);
-		if (pS){
+		assert(pTab && pExpr->pTab == pTab);/*判断被提取的列组成的表是否存在或者表达式中的列表是否存在*/
+		if (pS){/*如果被提取的列组成的select结构体存在*/
 			/* The "table" is actually a sub-select or a view in the FROM clause
 			** of the SELECT statement. Return the declaration type and origin
 			** data for the result-set column of the sub-select.
 			** "表"实际上是一个子选择，或者是一个在select语句的from子句的视图。
 			** 返回声明类型和来源数据的子选择的结果集列。
+			**这个表实质上是一个子查询结构或者是一个SELECT语法中FROM子句的视图。
+			给子查询的结果集列返回这个声明的类型或者原始的数据。
+			
 			*/
 			if (iCol >= 0 && ALWAYS(iCol < pS->pEList->nExpr)){
 				/* If iCol is less than zero, then the expression requests the
@@ -1315,6 +1351,9 @@ static const char *columnType(/*定义静态且是只读的字符型指针column
 				** test case misc2.2.2) - it always evaluates to NULL.
 				** 如果iCol小于零，则表达式请求子选择或视图的rowid。
 				** 这种表达式合法的(见测试案例misc2.2.2)-它始终计算为空。
+				*如果这个列号小于0，然后这个表达式请求子查询结果或视图的关键字。
+				这个表达式是合法的（参见下面misc2.2.2情况）
+			  **它总被认为是空值。 
 				*/
 				NameContext sNC;
 				Expr *p = pS->pEList->a[iCol].pExpr;/*被提取的列组成的select结构体中表达式列表中第i个表达式赋值给p*/
@@ -1345,7 +1384,7 @@ static const char *columnType(/*定义静态且是只读的字符型指针column
 		}
 		break;
 	}
-#ifndef SQLITE_OMIT_SUBQUERY
+#ifndef SQLITE_OMIT_SUBQUERY/*测试SQLITE_OMIT_SUBQUERY是被宏定义过*/
 	case TK_SELECT: {
 		/* The expression is a sub-select. Return the declaration type and
 		** origin info for the single column in the result set of the SELECT
